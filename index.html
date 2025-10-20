@@ -50,6 +50,27 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        .suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            z-index: 10;
+            max-height: 200px;
+            overflow-y: auto;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+        }
+        .suggestion-item {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .suggestion-item:hover {
+            background: #f0fdf4;
+        }
     </style>
 </head>
 <body class="min-h-screen">
@@ -70,16 +91,19 @@
     </header>
 
     <!-- Main Content -->
-    <main class="max-w-4xl mx-auto px-4 py-8">
+    <main class="max-w-4xl mx-auto px-4 py-8 relative">
         <!-- Search Section -->
-        <div class="bg-white rounded-xl shadow-sm p-6 mb-8 border border-emerald-100">
+        <div class="bg-white rounded-xl shadow-sm p-6 mb-8 border border-emerald-100 relative">
             <div class="flex flex-col sm:flex-row gap-3">
-                <input 
-                    type="text" 
-                    id="search-input" 
-                    placeholder="Enter city name..." 
-                    class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                >
+                <div class="relative flex-1">
+                    <input 
+                        type="text" 
+                        id="search-input" 
+                        placeholder="Enter city name..." 
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                    >
+                    <div id="suggestions" class="suggestions hidden"></div>
+                </div>
                 <button 
                     id="search-btn" 
                     class="bg-primary hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-300 flex items-center justify-center gap-2"
@@ -171,6 +195,7 @@
         const searchInput = document.getElementById('search-input');
         const searchBtn = document.getElementById('search-btn');
         const locationBtn = document.getElementById('location-btn');
+        const suggestions = document.getElementById('suggestions');
         const loading = document.getElementById('loading');
         const error = document.getElementById('error');
         const errorMessage = document.getElementById('error-message');
@@ -190,9 +215,9 @@
         const visibility = document.getElementById('visibility');
         const forecast = document.getElementById('forecast');
 
-       
-        const API_KEY = '9574a6415c768e6b4dd70618b71d9208'; 
-        
+        // 🔑 REPLACE THIS WITH YOUR ACTUAL API KEY FROM OPENWEATHER
+        const API_KEY = '9574a6415c768e6b4dd70618b71d9208'; // ←←← CHANGE THIS!
+
         // Weather icon mapping
         const weatherIcons = {
             '01d': 'fa-sun', '01n': 'fa-moon',
@@ -206,25 +231,7 @@
             '50d': 'fa-smog', '50n': 'fa-smog'
         };
 
-        // Initialize the app
-        function init() {
-            // Try to get user's location on load
-            if (navigator.geolocation) {
-                showLoading();
-                navigator.geolocation.getCurrentPosition(
-                    position => {
-                        const { latitude, longitude } = position.coords;
-                        fetchWeatherByCoords(latitude, longitude);
-                    },
-                    error => {
-                        hideLoading();
-                        showError('Unable to get your location. Please search for a city.');
-                    }
-                );
-            } else {
-                showError('Geolocation is not supported by your browser.');
-            }
-        }
+        let debounceTimer;
 
         // Show loading state
         function showLoading() {
@@ -254,71 +261,82 @@
             emptyState.classList.add('hidden');
         }
 
-        // Format date for display
+        // Format date
         function formatDate(timestamp) {
             const date = new Date(timestamp * 1000);
-            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-            return date.toLocaleDateString('en-US', options);
+            return date.toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
         }
 
-        // Format time for forecast
+        // Format forecast date
         function formatForecastDate(timestamp) {
             const date = new Date(timestamp * 1000);
             return date.toLocaleDateString('en-US', { weekday: 'short' });
         }
 
-        // Get weather icon class
+        // Get weather icon
         function getWeatherIcon(iconCode) {
             return weatherIcons[iconCode] || 'fa-cloud';
         }
 
-        // Fetch current weather and forecast by city name
-        async function fetchWeatherByCity(city) {
+        // Fetch city suggestions as user types
+        async function fetchCitySuggestions(query) {
+            if (!query.trim()) {
+                suggestions.classList.add('hidden');
+                return;
+            }
+
             try {
-                showLoading();
-                
-                // Fetch current weather
-                const currentResponse = await fetch(
-                    `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${API_KEY}&units=metric`
+                const response = await fetch(
+                    `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(query)}&limit=5&appid=${API_KEY}`
                 );
+                const cities = await response.json();
                 
-                if (!currentResponse.ok) {
-                    throw new Error('City not found');
+                if (cities.length === 0) {
+                    suggestions.classList.add('hidden');
+                    return;
                 }
-                
-                const currentData = await currentResponse.json();
-                
-                // Fetch 5-day forecast
-                const forecastResponse = await fetch(
-                    `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(city)}&appid=${API_KEY}&units=metric`
-                );
-                
-                const forecastData = await forecastResponse.json();
-                
-                displayWeather(currentData, forecastData);
-                hideLoading();
-                showWeather();
+
+                suggestions.innerHTML = '';
+                cities.forEach(city => {
+                    const item = document.createElement('div');
+                    item.className = 'suggestion-item';
+                    item.textContent = `${city.name}, ${city.country}`;
+                    item.dataset.lat = city.lat;
+                    item.dataset.lon = city.lon;
+                    item.addEventListener('click', () => {
+                        searchInput.value = `${city.name}, ${city.country}`;
+                        suggestions.classList.add('hidden');
+                        fetchWeatherByCoords(city.lat, city.lon);
+                    });
+                    suggestions.appendChild(item);
+                });
+                suggestions.classList.remove('hidden');
             } catch (err) {
-                hideLoading();
-                showError(err.message === 'City not found' ? 'City not found. Please check the spelling and try again.' : 'Failed to fetch weather data. Please try again.');
+                console.error('Error fetching suggestions:', err);
+                suggestions.classList.add('hidden');
             }
         }
 
         // Fetch weather by coordinates
         async function fetchWeatherByCoords(lat, lon) {
             try {
-                // Fetch current weather
+                showLoading();
+                
                 const currentResponse = await fetch(
                     `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`
                 );
                 
                 if (!currentResponse.ok) {
-                    throw new Error('Failed to get weather data');
+                    throw new Error('Failed to fetch weather data');
                 }
                 
                 const currentData = await currentResponse.json();
                 
-                // Fetch 5-day forecast
                 const forecastResponse = await fetch(
                     `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`
                 );
@@ -330,13 +348,12 @@
                 showWeather();
             } catch (err) {
                 hideLoading();
-                showError('Failed to fetch weather data for your location. Please try again.');
+                showError('Failed to fetch weather data. Please check your API key and try again.');
             }
         }
 
         // Display weather data
         function displayWeather(currentData, forecastData) {
-            // Current weather
             cityName.textContent = `${currentData.name}, ${currentData.sys.country}`;
             dateTime.textContent = formatDate(currentData.dt);
             weatherIcon.className = `fas ${getWeatherIcon(currentData.weather[0].icon)} text-5xl`;
@@ -344,11 +361,10 @@
             temperature.textContent = `${Math.round(currentData.main.temp)}°`;
             feelsLike.textContent = `Feels like ${Math.round(currentData.main.feels_like)}°`;
             humidity.textContent = `${currentData.main.humidity}%`;
-            windSpeed.textContent = `${Math.round(currentData.wind.speed * 3.6)} km/h`; // Convert m/s to km/h
+            windSpeed.textContent = `${Math.round(currentData.wind.speed * 3.6)} km/h`;
             pressure.textContent = `${currentData.main.pressure} hPa`;
             visibility.textContent = `${(currentData.visibility / 1000).toFixed(1)} km`;
 
-            // Forecast (every 24 hours - 5 days)
             forecast.innerHTML = '';
             const dailyForecasts = forecastData.list.filter((item, index) => index % 8 === 0).slice(0, 5);
             
@@ -366,21 +382,22 @@
         }
 
         // Event Listeners
-        searchBtn.addEventListener('click', () => {
-            const city = searchInput.value.trim();
-            if (city) {
-                fetchWeatherByCity(city);
-                searchInput.value = '';
+        searchInput.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                fetchCitySuggestions(searchInput.value);
+            }, 300);
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.relative')) {
+                suggestions.classList.add('hidden');
             }
         });
 
-        searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                const city = searchInput.value.trim();
-                if (city) {
-                    fetchWeatherByCity(city);
-                    searchInput.value = '';
-                }
+        searchBtn.addEventListener('click', () => {
+            if (searchInput.value.trim()) {
+                fetchCitySuggestions(searchInput.value);
             }
         });
 
@@ -402,8 +419,18 @@
             }
         });
 
-        // Initialize the app
-        init();
+        // Initialize with user location
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    const { latitude, longitude } = position.coords;
+                    fetchWeatherByCoords(latitude, longitude);
+                },
+                error => {
+                    emptyState.classList.remove('hidden');
+                }
+            );
+        }
     </script>
 </body>
 </html>
