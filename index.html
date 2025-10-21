@@ -1,220 +1,77 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weather Dashboard | Lukáš Hriž</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Weather Dashboard | Lukáš Hriž</title>
 
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-    <script>
-        // Tailwind custom colors
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#10b981',
-                        secondary: '#34d399',
-                        dark: '#0f172a'
-                    }
-                }
+  <!-- Inter Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: '#e0f2e9',
+              100: '#c8e6d9',
+              200: '#a8d8b9',
+              300: '#8ac9a0',
+              400: '#6ab097',
+              500: '#4a9985',
+              600: '#3a7d6a',
             }
+          },
+          borderRadius: {
+            '4xl': '2rem'
+          }
         }
-    </script>
+      }
+    }
+  </script>
 
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap');
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #f9fbfa 0%, #edf6f2 100%);
+      color: #1f2937;
+    }
 
-        body {
-            font-family: 'Poppins', sans-serif;
-            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-        }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(209, 213, 219, 0.6);
+      box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.06);
+      border-radius: 1.75rem;
+      padding: 1.5rem;
+    }
 
-        /* Card hover effect */
-        .weather-card {
-            transition: all 0.3s ease;
-        }
-        .weather-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px -5px rgba(16, 181, 129, 0.3);
-        }
+    .weather-card {
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      border-radius: 1.5rem;
+      overflow: hidden;
+    }
 
-        /* Search button hover */
-        .search-btn {
-            transition: all 0.2s ease;
-        }
-        .search-btn:hover {
-            background-color: #059669;
-        }
+    .weather-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 30px -10px rgba(74, 153, 133, 0.25);
+    }
 
-        /* Loading spinner */
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(16, 181, 129, 0.3);
-            border-radius: 50%;
-            border-top-color: #10b981;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* Autocomplete suggestions */
-        .suggestions {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: white;
-            border: 1px solid #e5e7eb;
-            border-radius: 0.5rem;
-            z-index: 10;
-            max-height: 200px;
-            overflow-y: auto;
-            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
-        }
-        .suggestion-item {
-            padding: 0.75rem 1rem;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        .suggestion-item:hover {
-            background: #f0fdf4;
-        }
-
-        /* Example cities */
-        .example-cities { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-        .example-city {
-            background: #f0fdf4;
-            border: 1px solid #dcfce7;
-            border-radius: 9999px;
-            padding: 4px 12px;
-            font-size: 0.875rem;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .example-city:hover {
-            background: #dcfce7;
-            transform: translateY(-2px);
-        }
-    </style>
-</head>
-<body class="min-h-screen">
-
-<!-- HEADER -->
-<header class="bg-white shadow-sm">
-    <div class="max-w-4xl mx-auto px-4 py-6 flex justify-between items-center">
-        <h1 class="text-2xl font-bold flex items-center gap-2">
-            <i class="fas fa-cloud-sun text-primary"></i> Weather Dashboard
-        </h1>
-        <div class="text-sm text-gray-600 flex items-center gap-2">
-            <i class="fas fa-code"></i>
-            <span>by Lukáš Hriž</span>
-        </div>
-    </div>
-</header>
-
-<!-- MAIN CONTENT -->
-<main class="max-w-4xl mx-auto px-4 py-8 relative">
-
-    <!-- SEARCH BOX -->
-    <div class="bg-white rounded-xl shadow-sm p-6 mb-8 border border-emerald-100 relative">
-        <div class="flex flex-col sm:flex-row gap-3">
-            <div class="relative flex-1">
-                <input id="search-input" type="text" placeholder="Enter city name (Prague, New York...)" 
-                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none">
-                <div id="suggestions" class="suggestions hidden"></div>
-            </div>
-            <button id="search-btn" class="bg-primary text-white px-6 py-3 rounded-lg font-medium flex items-center gap-2">
-                <i class="fas fa-search"></i> Search
-            </button>
-            <button id="location-btn" class="bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium flex items-center gap-2">
-                <i class="fas fa-location-dot"></i> My Location
-            </button>
-        </div>
-
-        <!-- Example cities -->
-        <div class="example-cities mt-4">
-            <span class="text-gray-600 text-sm">Try these cities:</span>
-            <div class="flex flex-wrap gap-2 mt-1">
-                <span class="example-city" data-city="Prague">Prague</span>
-                <span class="example-city" data-city="New York">New York</span>
-                <span class="example-city" data-city="Paris">Paris</span>
-                <span class="example-city" data-city="Tokyo">Tokyo</span>
-                <span class="example-city" data-city="Sydney">Sydney</span>
-                <span class="example-city" data-city="London">London</span>
-                <span class="example-city" data-city="Berlin">Berlin</span>
-                <span class="example-city" data-city="Rome">Rome</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- LOADING -->
-    <div id="loading" class="hidden text-center py-12">
-        <div class="loading mx-auto mb-4"></div>
-        <p class="text-gray-600">Fetching weather data...</p>
-    </div>
-
-    <!-- ERROR -->
-    <div id="error" class="hidden bg-red-50 border border-red-200 rounded-xl p-6 text-center">
-        <i class="fas fa-exclamation-triangle text-red-500 text-2xl mb-2"></i>
-        <p id="error-message" class="text-red-700 font-medium">City not found. Please try again.</p>
-    </div>
-
-    <!-- WEATHER DISPLAY -->
-    <div id="weather-display" class="hidden">
-
-        <!-- Current Weather -->
-        <div class="weather-card bg-white rounded-xl shadow-sm p-6 mb-8 border border-emerald-100">
-            <div class="flex flex-col md:flex-row justify-between items-center">
-                <div class="text-center md:text-left mb-6 md:mb-0">
-                    <h2 id="city-name" class="text-3xl font-bold text-gray-800 mb-2">Prague</h2>
-                    <p id="date-time" class="text-gray-600 mb-4">Monday, January 1, 2024</p>
-                    <div class="flex items-center justify-center md:justify-start gap-4">
-                        <div class="text-center">
-                            <i id="weather-icon" class="fas fa-sun text-5xl text-yellow-500 mb-2"></i>
-                            <p id="weather-description" class="text-gray-600 capitalize">Sunny</p>
-                        </div>
-                        <div>
-                            <p id="temperature" class="text-5xl font-bold text-gray-800">22°</p>
-                            <p id="feels-like" class="text-gray-600">Feels like 24°</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4 text-center">
-                    <div><p class="text-sm text-gray-600">Humidity</p><p id="humidity" class="text-xl font-semibold text-gray-800">65%</p></div>
-                    <div><p class="text-sm text-gray-600">Wind</p><p id="wind-speed" class="text-xl font-semibold text-gray-800">12 km/h</p></div>
-                    <div><p class="text-sm text-gray-600">Pressure</p><p id="pressure" class="text-xl font-semibold text-gray-800">1013 hPa</p></div>
-                    <div><p class="text-sm text-gray-600">Visibility</p><p id="visibility" class="text-xl font-semibold text-gray-800">10 km</p></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Forecast -->
-        <div class="bg-white rounded-xl shadow-sm p-6 border border-emerald-100">
-            <h3 class="text-xl font-bold text-gray-800 mb-4">5-Day Forecast</h3>
-            <div id="forecast" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-                <!-- Forecast cards injected by JS -->
-            </div>
-        </div>
-
-    </div>
-
-    <!-- EMPTY STATE -->
-    <div id="empty-state" class="text-center py-12 text-gray-500">
-        <i class="fas fa-cloud-sun text-4xl mb-4 text-gray-300"></i>
-        <p class="text-lg">Search for a city or use your current location</p>
-        <p class="mt-2">to get real-time weather information</p>
-        <p class="mt-4 text-sm text-gray-600">Try: <span class="font-medium">Prague, New York, Paris, Tokyo, Sydney</span></p>
-    </div>
-
-</main>
-
+    .btn-primary {
+      background: linear-gradient(135deg, #4a9985, #3a7d6a);
+      color: white;
+      border-radius: 1rem;
+      padding: 0.6rem 1.25rem;
+      font-weight: 600;
+  </div>
 <!-- SCRIPTS -->
 <script>
     // ELEMENTS
